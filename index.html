@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>森森天氣：Turbo Granny 靈異版（簡約）</title>
-    <link rel="icon" type="image/png" href="./icon-v2.png">
+    <title>KUO天氣</title>
+    <link rel="icon" type="image/png" href="./icon.png">
 
     <!-- 字體：清楚、可讀性強 -->
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
@@ -235,117 +235,147 @@
     </div>
 
     <script>
-        /* API 和邏輯不變 */
-        const API_URL = "https://weather-hsz-kuo.zeabur.app/api/weather/hsinchu";
+    const API_URL = "https://weather-hsz-kuo.zeabur.app/api/weather/hsinchu";
 
-        function getWeatherIcon(weather) {
-            if (!weather) return "🌤️";
-            if (weather.includes("晴")) return "☀️";
-            if (weather.includes("多雲")) return "⛅";
-            if (weather.includes("陰")) return "☁️";
-            if (weather.includes("雨")) return "🌧️";
-            if (weather.includes("雷")) return "⛈️";
-            return "🌤️";
+    // 把 "28°C" -> 28 這種
+    function toNumberTemp(tempStr) {
+        if (tempStr == null) return NaN;
+        const m = String(tempStr).match(/-?\d+(\.\d+)?/); // 抓裡面的數字
+        return m ? parseFloat(m[0]) : NaN;
+    }
+
+    function getWeatherIcon(weather) {
+        if (!weather) return "🌤️";
+        if (weather.includes("晴")) return "☀️";
+        if (weather.includes("多雲")) return "⛅";
+        if (weather.includes("陰")) return "☁️";
+        if (weather.includes("雨")) return "🌧️";
+        if (weather.includes("雷")) return "⛈️";
+        return "🌤️";
+    }
+
+    function getAdvice(rainProb, maxTempStr) {
+        let rainIcon = "🌂", rainText = "不用帶傘";
+        if (parseInt(rainProb) > 30) {
+            rainIcon = "☂️"; 
+            rainText = "記得帶傘";
         }
 
-        function getAdvice(rainProb, maxTemp) {
-            let rainIcon = "🌂", rainText = "不用帶傘";
-            if (parseInt(rainProb) > 30) {
-                rainIcon = "☂️"; rainText = "記得帶傘";
-            }
+        const maxTemp = toNumberTemp(maxTempStr); // "28°C" -> 28
 
-            let clothIcon = "👕", clothText = "舒適穿搭";
-            if (maxTemp >= 28) { clothIcon = "🎽"; clothText = "短袖即可"; }
-            else if (maxTemp <= 20) { clothIcon = "🧥"; clothText = "建議外套"; }
-
-            return { rainIcon, rainText, clothIcon, clothText };
+        let clothIcon = "👕", clothText = "舒服的天氣😀";
+        if (maxTemp >= 28) { 
+            clothIcon = "🎽"; 
+            clothText = "太熱了🥵"; 
+        } else if (maxTemp <= 23) { 
+            clothIcon = "🧥"; 
+            clothText = "有點涼😶‍🌫️"; 
+        } else if (maxTemp <= 18) { 
+            clothIcon = "🧥"; 
+            clothText = "真的冷🥶"; 
         }
 
-        function getTimePeriod(startTime) {
-            const h = new Date(startTime).getHours();
-            if (h < 5) return "深夜";
-            if (h < 11) return "早晨";
-            if (h < 14) return "中午";
-            if (h < 18) return "下午";
-            if (h < 23) return "晚上";
-            return "深夜";
-        }
+        return { rainIcon, rainText, clothIcon, clothText };
+    }
 
-        function renderWeather(data) {
-            const fs = data.forecasts;
-            const cur = fs[0];
-            const list = fs.slice(1);
+    function safeDate(str) {
+        // CWA 給的是 "2025-02-24 06:00:00"，轉成較安全的格式
+        return new Date(String(str).replace(" ", "T"));
+    }
 
-            const period = getTimePeriod(cur.startTime);
-            const avgTemp = Math.round((+cur.maxTemp + +cur.minTemp) / 2);
-            const advice = getAdvice(cur.rain, cur.maxTemp);
+    function getTimePeriod(startTime) {
+        const h = safeDate(startTime).getHours();
+        if (h < 5) return "深夜";
+        if (h < 11) return "早晨";
+        if (h < 14) return "中午";
+        if (h < 18) return "下午";
+        if (h < 23) return "晚上";
+        return "深夜";
+    }
 
-            document.getElementById("heroCard").innerHTML = `
-                <div class="hero-card">
-                    <div class="hero-period">${period}</div>
+    function renderWeather(data) {
+        const fs = data.forecasts;
+        const cur = fs[0];
+        const list = fs.slice(1);
 
-                    <div class="hero-icon">${getWeatherIcon(cur.weather)}</div>
-                    <div class="hero-temp">${avgTemp}°</div>
-                    <div class="hero-desc">${cur.weather}</div>
+        const period = getTimePeriod(cur.startTime);
 
-                    <div class="advice-grid">
-                        <div class="advice-item">
-                            <div class="advice-icon">${advice.rainIcon}</div>
-                            <div class="advice-text">${advice.rainText}</div>
-                            <div style="font-size:.75rem; opacity:.7;">降雨率 ${cur.rain}</div>
-                        </div>
-                        <div class="advice-item">
-                            <div class="advice-icon">${advice.clothIcon}</div>
-                            <div class="advice-text">${advice.clothText}</div>
-                            <div style="font-size:.75rem; opacity:.7;">最高溫 ${cur.maxTemp}°</div>
-                        </div>
+        const maxT = toNumberTemp(cur.maxTemp);
+        const minT = toNumberTemp(cur.minTemp);
+        const avgTemp = Math.round((maxT + minT) / 2);  // 這裡就不會 NaN 了
+
+        const advice = getAdvice(cur.rain, cur.maxTemp);
+
+        document.getElementById("heroCard").innerHTML = `
+            <div class="hero-card">
+                <div class="hero-period">${period}</div>
+
+                <div class="hero-icon">${getWeatherIcon(cur.weather)}</div>
+                <div class="hero-temp">${avgTemp}°</div>
+                <div class="hero-desc">${cur.weather}</div>
+
+                <div class="advice-grid">
+                    <div class="advice-item">
+                        <div class="advice-icon">${advice.rainIcon}</div>
+                        <div class="advice-text">${advice.rainText}</div>
+                        <div style="font-size:.75rem; opacity:.7;">降雨率 ${cur.rain}</div>
+                    </div>
+                    <div class="advice-item">
+                        <div class="advice-icon">${advice.clothIcon}</div>
+                        <div class="advice-text">${advice.clothText}</div>
+                        <div style="font-size:.75rem; opacity:.7;">最高溫 ${cur.maxTemp}</div>
                     </div>
                 </div>
+            </div>
+        `;
+
+        /* 小卡片 */
+        const today = new Date().getDate();
+        const box = document.getElementById("futureForecasts");
+        box.innerHTML = "";
+
+        list.forEach(f => {
+            let p = getTimePeriod(f.startTime);
+            const d = safeDate(f.startTime).getDate();
+            if (d !== today) p = "明天" + p;
+
+            box.innerHTML += `
+                <div class="mini-card">
+                    <div class="mini-time">${p}</div>
+                    <div class="mini-icon">${getWeatherIcon(f.weather)}</div>
+                    <div class="mini-temp">${f.minTemp} - ${f.maxTemp}</div>
+                    <div style="font-size:.8rem; opacity:.6;">💧${f.rain}</div>
+                </div>
             `;
+        });
 
-            /* 小卡片 */
-            const today = new Date().getDate();
-            const box = document.getElementById("futureForecasts");
-            box.innerHTML = "";
+        const now = new Date();
+        document.getElementById("updateTime").textContent =
+            `${now.getMonth() + 1}/${now.getDate()}`;
+    }
 
-            list.forEach(f => {
-                let p = getTimePeriod(f.startTime);
-                const d = new Date(f.startTime).getDate();
-                if (d !== today) p = "明天" + p;
+    async function fetchWeather() {
+        try {
+            const delay = new Promise(r => setTimeout(r, 900));
+            const fetchData = fetch(API_URL).then(r => r.json());
+            const [_, json] = await Promise.all([delay, fetchData]);
 
-                box.innerHTML += `
-                    <div class="mini-card">
-                        <div class="mini-time">${p}</div>
-                        <div class="mini-icon">${getWeatherIcon(f.weather)}</div>
-                        <div class="mini-temp">${f.minTemp}° - ${f.maxTemp}°</div>
-                        <div style="font-size:.8rem; opacity:.6;">💧${f.rain}</div>
-                    </div>
-                `;
-            });
-
-            const now = new Date();
-            document.getElementById("updateTime").textContent =
-                `${now.getMonth()+1}/${now.getDate()}`;
-        }
-
-        async function fetchWeather() {
-            try {
-                const delay = new Promise(r => setTimeout(r, 900));
-                const fetchData = fetch(API_URL).then(r => r.json());
-                const [_, json] = await Promise.all([delay, fetchData]);
-
-                if (json.success) {
-                    renderWeather(json.data);
-                    document.getElementById("loading").style.display = "none";
-                    document.getElementById("mainContent").style.display = "block";
-                }
-            } catch {
-                alert("資料取得失敗！");
+            if (json.success && json.data && json.data.forecasts) {
+                renderWeather(json.data);
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("mainContent").style.display = "block";
+            } else {
+                alert("資料格式異常！");
+                console.log("API 回傳內容：", json);
             }
+        } catch (e) {
+            console.error(e);
+            alert("資料取得失敗！");
         }
+    }
 
-        document.addEventListener("DOMContentLoaded", fetchWeather);
-    </script>
+    document.addEventListener("DOMContentLoaded", fetchWeather);
+</script>
 
 </body>
 </html>
